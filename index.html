@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>District Health Performance Analyzer</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏥</text></svg>">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h1 class="h3 mb-0">
+                            <i class="bi bi-hospital"></i>
+                            District Health Performance Analyzer
+                        </h1>
+                        <p class="mb-0 opacity-75">Helping government officers improve public health outcomes</p>
+                    </div>
+                    <div class="card-body">
+                        <!-- API Configuration -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <button id="config-api-btn" class="btn btn-outline-secondary">
+                                    <i class="bi bi-gear"></i> Configure LLM API
+                                </button>
+                                <small class="text-muted d-block mt-1">Set up your AI provider for analysis</small>
+                            </div>
+                            <div class="col-md-6">
+                                <button id="load-sample-btn" class="btn btn-success">
+                                    <i class="bi bi-file-earmark-arrow-down"></i> Load Sample Data
+                                </button>
+                                <small class="text-muted d-block mt-1">Load district health data from CSV</small>
+                            </div>
+                        </div>
+
+                        <!-- Query Form -->
+                        <form id="analysis-form" class="border rounded p-4 bg-white">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="district-name" class="form-label">
+                                        <i class="bi bi-geo-alt"></i> District Name *
+                                    </label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="district-name" 
+                                           name="district-name"
+                                           placeholder="e.g., Agra, Lucknow, Kanpur"
+                                           required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="block-name" class="form-label">
+                                        <i class="bi bi-map"></i> Block Name (Optional)
+                                    </label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="block-name" 
+                                           name="block-name"
+                                           placeholder="e.g., Fatehabad, Kiraoli">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="user-query" class="form-label">
+                                    <i class="bi bi-chat-square-text"></i> Your Query
+                                </label>
+                                <textarea class="form-control" 
+                                          id="user-query" 
+                                          name="user-query"
+                                          rows="3" 
+                                          placeholder="e.g., I want to reduce maternal mortality rate in Agra, Uttar Pradesh"
+                                          required></textarea>
+                                <div class="form-text">
+                                    Ask about any health indicator improvement, performance comparison, or specific intervention needed.
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg" id="analyze-btn">
+                                <i class="bi bi-search"></i> Analyze Health Performance
+                            </button>
+                        </form>
+
+                        <!-- Loading Indicator -->
+                        <div id="loading-indicator" class="text-center py-4 d-none">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Analyzing health data and generating insights...</p>
+                        </div>
+
+                        <!-- Results Section -->
+                        <div id="results-section" class="mt-4 d-none">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h4 class="mb-0">
+                                        <i class="bi bi-graph-up"></i> Analysis Results
+                                    </h4>
+                                </div>
+                                <div class="card-body">
+                                    <div id="results-content"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Status -->
+                        <div id="data-status" class="mt-4">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Data Status:</strong> <span id="data-status-text">No data loaded. Click "Load Sample Data" to begin.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal fade" id="error-modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle"></i> Error
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="error-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html> 
