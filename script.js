@@ -10,6 +10,25 @@ class HealthAnalyzer {
     constructor() {
         this.data = [];
         this.apiConfig = null;
+        this.defaultSystemPrompt = `You are a governance expert assistant helping district-level administrators in India.
+
+The user wants to solve the following issue based on the available data from Uttar Pradesh.
+
+Based on the available data, provide:
+
+1. **Relevant Indicators** from national or state-level government programs (e.g., NHM, Aspirational Districts, NITI Aayog) tied to the problem.
+
+2. **District Performance** and rank across the state on these indicators.
+
+3. **Block-wise Breakdown** to identify weak-performing blocks that need immediate attention.
+
+4. **Actionable Suggestions** with specific targets (e.g., "improving institutional deliveries from 75% to 85% may improve the ranking from 35 to 25").
+
+5. **Predicted Impact** based on improvements in indicators with realistic timelines.
+
+6. **Ranking** of the district and block based on the indicators, How much the rank will improve if the indicators are improved.
+
+Present insights in a human-readable, decision-friendly format that government officers can act upon immediately. Use bullet points, numbers, and clear recommendations. Be concise but comprehensive.`;
         this.init();
     }
 
@@ -18,6 +37,19 @@ class HealthAnalyzer {
         this.setupEventListeners();
         this.setupFormSaving();
         this.checkDataStatus();
+        this.setupSystemPromptUI();
+    }
+
+    setupSystemPromptUI() {
+        const textarea = document.getElementById('system-prompt-textarea');
+        if (!textarea) return;
+        // Load from localStorage or use default
+        const savedPrompt = localStorage.getItem('systemPrompt');
+        textarea.value = savedPrompt || this.defaultSystemPrompt;
+        // Save on change
+        textarea.addEventListener('input', () => {
+            localStorage.setItem('systemPrompt', textarea.value);
+        });
     }
 
     async loadLLMConfig(forceShow = false) {
@@ -243,25 +275,12 @@ ${data.slice(0, 5).map(record =>
     }
 
     async callLLMAPIStreaming(context, districtName, blockName) {
-        const systemPrompt = `You are a governance expert assistant helping district-level administrators in India.
-
-The user wants to solve the following issue based on the available data from Uttar Pradesh.
-
-Based on the available data, provide:
-
-1. **Relevant Indicators** from national or state-level government programs (e.g., NHM, Aspirational Districts, NITI Aayog) tied to the problem.
-
-2. **District Performance** and rank across the state on these indicators.
-
-3. **Block-wise Breakdown** to identify weak-performing blocks that need immediate attention.
-
-4. **Actionable Suggestions** with specific targets (e.g., "improving institutional deliveries from 75% to 85% may improve the ranking from 35 to 25").
-
-5. **Predicted Impact** based on improvements in indicators with realistic timelines.
-
-6. **Ranking** of the district and block based on the indicators, How much the rank will improve if the indicators are improved.
-
-Present insights in a human-readable, decision-friendly format that government officers can act upon immediately. Use bullet points, numbers, and clear recommendations. Be concise but comprehensive.`;
+        // Get system prompt from textarea (or fallback)
+        let systemPrompt = this.defaultSystemPrompt;
+        const textarea = document.getElementById('system-prompt-textarea');
+        if (textarea && textarea.value.trim()) {
+            systemPrompt = textarea.value.trim();
+        }
         
         const response = await fetch(`${this.apiConfig.baseURL}/chat/completions`, {
             method: 'POST',
