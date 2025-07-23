@@ -13,16 +13,28 @@ class HealthAnalyzer {
         this.init();
     }
 
-    init() {
+    async init() {
+        await this.loadLLMConfig();
         this.setupEventListeners();
         this.setupFormSaving();
         this.checkDataStatus();
     }
 
+    async loadLLMConfig(forceShow = false) {
+        // Use openaiConfig with sessionStorage to persist config
+        this.apiConfig = await openaiConfig({
+            storage: sessionStorage,
+            key: "llmProvider",
+            show: forceShow
+        });
+    }
+
     setupEventListeners() {
-        document.getElementById('config-api-btn').addEventListener('click', () => this.configureAPI());
         document.getElementById('load-sample-btn').addEventListener('click', () => this.loadSampleData());
         document.getElementById('analysis-form').addEventListener('submit', (e) => this.handleAnalysis(e));
+        document.getElementById('config-api-btn').addEventListener('click', async () => {
+            await openaiConfig({ storage: sessionStorage, key: "llmProvider", show: true });
+        });
     }
 
     setupFormSaving() {
@@ -30,23 +42,6 @@ class HealthAnalyzer {
             prefix: "health_analyzer_",
             events: ["change", "input"]
         });
-    }
-
-    async configureAPI() {
-        try {
-            this.apiConfig = await openaiConfig({
-                title: "Configure LLM API for Health Analysis",
-                defaultBaseUrls: [
-                    "https://api.openai.com/v1",
-                    "https://openrouter.ai/api/v1",
-                    "https://api.anthropic.com/v1"
-                ],
-                show: true,
-            });
-            this.showSuccess("API configured successfully!");
-        } catch (error) {
-            this.showError("Failed to configure API: " + error.message);
-        }
     }
 
     async loadSampleData() {
@@ -87,6 +82,10 @@ class HealthAnalyzer {
     async handleAnalysis(event) {
         event.preventDefault();
         
+        if (!this.apiConfig) {
+            // Try to load config if not already loaded
+            await this.loadLLMConfig();
+        }
         if (!this.apiConfig) {
             this.showError("Please configure your LLM API first.");
             return;
