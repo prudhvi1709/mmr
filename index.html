@@ -39,17 +39,36 @@
 
                         <!-- Query Form -->
                         <form id="analysis-form" class="border rounded p-4 bg-white">
-                            <div class="row mb-3">
+                            <!-- Analysis Level Toggle -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-toggles"></i> Analysis Level
+                                </label>
+                                <div class="btn-group w-100" role="group" aria-label="Analysis Level">
+                                    <input type="radio" class="btn-check" name="analysis-level" id="state-level" value="state" checked>
+                                    <label class="btn btn-outline-primary" for="state-level">
+                                        <i class="bi bi-map"></i> State Level (Uttar Pradesh)
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="analysis-level" id="district-level" value="district">
+                                    <label class="btn btn-outline-primary" for="district-level">
+                                        <i class="bi bi-geo-alt"></i> District Level
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- District Selection (only shown for district level) -->
+                            <div id="district-selection" class="row mb-3" style="display: none;">
                                 <div class="col-md-6">
                                     <label for="district-name" class="form-label">
                                         <i class="bi bi-geo-alt"></i> District Name *
                                     </label>
-                                    <input type="text" 
-                                           class="form-control" 
+                                    <select class="form-select" 
                                            id="district-name" 
-                                           name="district-name"
-                                           placeholder="e.g., Agra, Lucknow, Kanpur"
-                                           required>
+                                           name="district-name">
+                                        <option value="">Select a district...</option>
+                                    </select>
+                                    <small class="text-muted">Load sample data first to populate districts</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="block-name" class="form-label">
@@ -71,7 +90,7 @@
                                           id="user-query" 
                                           name="user-query"
                                           rows="3" 
-                                          placeholder="e.g., I want to reduce maternal mortality rate in Agra, Uttar Pradesh"
+                                          placeholder="e.g., I want to reduce maternal mortality rate in Uttar Pradesh"
                                           required></textarea>
                                 <div class="form-text">
                                     Ask about any health indicator improvement, performance comparison, or specific intervention needed.

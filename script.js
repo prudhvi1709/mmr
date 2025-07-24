@@ -10,23 +10,35 @@ class HealthAnalyzer {
     constructor() {
         this.data = [];
         this.apiConfig = null;
-        this.defaultSystemPrompt = `You are a governance expert assistant helping district-level administrators in India.
+        this.defaultSystemPrompt = `You are a governance expert assistant helping administrators in India analyze health data.
 
-The user wants to solve the following issue based on the available data from Uttar Pradesh.
+The user wants to solve health issues based on available data from Uttar Pradesh.
+
+For STATE-LEVEL ANALYSIS:
+- Provide state-wide overview and district comparisons
+- Identify top and underperforming districts
+- Suggest state-level policy interventions
+- Compare districts and recommend focus areas
+
+For DISTRICT-LEVEL ANALYSIS:
+- Focus on specific district performance
+- Provide block-wise breakdown within the district
+- Compare with state averages
+- Suggest district-specific interventions
 
 Based on the available data, provide:
 
 1. **Relevant Indicators** from national or state-level government programs (e.g., NHM, Aspirational Districts, NITI Aayog) tied to the problem.
 
-2. **District Performance** and rank across the state on these indicators.
+2. **Performance Analysis** and ranking across the state/district on these indicators.
 
-3. **Block-wise Breakdown** to identify weak-performing blocks that need immediate attention.
+3. **Sub-unit Breakdown** (districts for state analysis, blocks for district analysis) to identify weak-performing areas needing immediate attention.
 
 4. **Actionable Suggestions** with specific targets (e.g., "improving institutional deliveries from 75% to 85% may improve the ranking from 35 to 25").
 
 5. **Predicted Impact** based on improvements in indicators with realistic timelines.
 
-6. **Ranking** of the district and block based on the indicators, How much the rank will improve if the indicators are improved.
+6. **Ranking Analysis** showing current position and potential improvements if indicators are enhanced.
 
 Present insights in a human-readable, decision-friendly format that government officers can act upon immediately. Use bullet points, numbers, and clear recommendations. Be concise but comprehensive.`;
         this.init();
@@ -38,6 +50,31 @@ Present insights in a human-readable, decision-friendly format that government o
         this.setupFormSaving();
         this.checkDataStatus();
         this.setupSystemPromptUI();
+        this.setupAnalysisLevelToggle();
+    }
+
+    setupAnalysisLevelToggle() {
+        const stateRadio = document.getElementById('state-level');
+        const districtRadio = document.getElementById('district-level');
+        const districtSelection = document.getElementById('district-selection');
+        const districtSelect = document.getElementById('district-name');
+        const userQueryTextarea = document.getElementById('user-query');
+
+        // Handle toggle changes
+        const handleToggleChange = () => {
+            if (districtRadio.checked) {
+                districtSelection.style.display = 'block';
+                districtSelect.setAttribute('required', 'required');
+                userQueryTextarea.placeholder = "e.g., I want to reduce maternal mortality rate in Agra district";
+            } else {
+                districtSelection.style.display = 'none';
+                districtSelect.removeAttribute('required');
+                userQueryTextarea.placeholder = "e.g., I want to reduce maternal mortality rate in Uttar Pradesh";
+            }
+        };
+
+        stateRadio.addEventListener('change', handleToggleChange);
+        districtRadio.addEventListener('change', handleToggleChange);
     }
 
     setupSystemPromptUI() {
@@ -86,6 +123,9 @@ Present insights in a human-readable, decision-friendly format that government o
             const csvText = await response.text();
             this.data = this.parseCSV(csvText);
             
+            // Populate district dropdown
+            this.populateDistrictDropdown();
+            
             this.updateDataStatus(`Loaded ${this.data.length} records from sample data`);
             this.showSuccess(`Successfully loaded ${this.data.length} health records!`);
             
@@ -95,6 +135,27 @@ Present insights in a human-readable, decision-friendly format that government o
         } finally {
             this.hideLoading();
         }
+    }
+
+    populateDistrictDropdown() {
+        const districtSelect = document.getElementById('district-name');
+        if (!districtSelect) return;
+
+        // Extract unique districts from data
+        const districts = [...new Set(this.data.map(record => record['District Name']))].sort();
+        
+        // Clear existing options except the first one
+        districtSelect.innerHTML = '<option value="">Select a district...</option>';
+        
+        // Add district options
+        districts.forEach(district => {
+            if (district && district.trim()) {
+                const option = document.createElement('option');
+                option.value = district;
+                option.textContent = district;
+                districtSelect.appendChild(option);
+            }
+        });
     }
 
     parseCSV(csvText) {
@@ -129,18 +190,29 @@ Present insights in a human-readable, decision-friendly format that government o
         }
 
         const formData = new FormData(event.target);
+        const analysisLevel = formData.get('analysis-level');
         const districtName = formData.get('district-name');
         const blockName = formData.get('block-name');
         const userQuery = formData.get('user-query');
 
-        if (!districtName || !userQuery) {
-            this.showError("Please fill in the district name and your query.");
+        if (!userQuery) {
+            this.showError("Please enter your query.");
+            return;
+        }
+
+        // Validate based on analysis level
+        if (analysisLevel === 'district' && !districtName) {
+            this.showError("Please select a district for district-level analysis.");
             return;
         }
 
         try {
             this.showLoading("Analyzing health data...");
-            await this.performAnalysis(districtName, blockName, userQuery);
+            if (analysisLevel === 'state') {
+                await this.performStateAnalysis(userQuery);
+            } else {
+                await this.performDistrictAnalysis(districtName, blockName, userQuery);
+            }
         } catch (error) {
             this.showError("Analysis failed: " + error.message);
         } finally {
@@ -148,7 +220,18 @@ Present insights in a human-readable, decision-friendly format that government o
         }
     }
 
-    async performAnalysis(districtName, blockName, userQuery) {
+    async performStateAnalysis(userQuery) {
+        // For state-level analysis, use all data
+        const stateData = this.data;
+        
+        // Prepare context for state-level LLM analysis
+        const analysisContext = this.prepareStateAnalysisContext(stateData, userQuery);
+        
+        // Call LLM API with streaming
+        await this.callLLMAPIStreaming(analysisContext, "Uttar Pradesh", null, true);
+    }
+
+    async performDistrictAnalysis(districtName, blockName, userQuery) {
         // Filter data for the selected district
         const districtData = this.data.filter(record => 
             record['District Name'].toLowerCase().includes(districtName.toLowerCase())
@@ -165,13 +248,109 @@ Present insights in a human-readable, decision-friendly format that government o
             ) : districtData;
 
         // Prepare context for LLM
-        const analysisContext = this.prepareAnalysisContext(relevantData, districtName, blockName, userQuery);
+        const analysisContext = this.prepareDistrictAnalysisContext(relevantData, districtName, blockName, userQuery);
         
         // Call LLM API with streaming
-        await this.callLLMAPIStreaming(analysisContext, districtName, blockName);
+        await this.callLLMAPIStreaming(analysisContext, districtName, blockName, false);
     }
 
-    prepareAnalysisContext(data, districtName, blockName, userQuery) {
+    prepareStateAnalysisContext(data, userQuery) {
+        // Calculate state-level statistics
+        const stateStats = this.calculateStateStats(data);
+        
+        // Get district-wise performance ranking
+        const districtPerformance = this.analyzeDistrictPerformance(data);
+        
+        // Key indicators for state-level analysis
+        const keyIndicators = [
+            '% of institutional births',
+            '% of Mothers who had full antenatal care',
+            'Maternal Mortality Ratio',
+            '% of pregnant women received 4 or more ANC against estimated PW',
+            '% of pregnant women delivered in institution against estimated delivery',
+            'Percentage of Pregnant women age 15-49 years who are anemic (<11.0g/dI)',
+            '% of C-section delivery against reported delivery (70% weightage to CHC and 30% to DH)'
+        ];
+
+        const context = `
+STATE: UTTAR PRADESH
+Analysis Level: STATE-WIDE
+
+USER PROBLEM: "${userQuery}"
+
+STATE-WIDE DATA SUMMARY:
+- Total districts analyzed: ${stateStats.totalDistricts}
+- Total blocks analyzed: ${data.length}
+- State average Maternal Mortality Ratio: ${stateStats.avgMMR.toFixed(1)}
+- State average Institutional Births: ${stateStats.avgInstitutionalBirths.toFixed(1)}%
+- State average Full ANC: ${stateStats.avgFullANC.toFixed(1)}%
+
+KEY INDICATORS ANALYSIS (STATE-WIDE):
+${keyIndicators.map(indicator => {
+    const values = data.map(d => parseFloat(d[indicator]) || 0);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return `- ${indicator}: State Avg: ${avg.toFixed(1)}%, Range: ${min.toFixed(1)}% - ${max.toFixed(1)}%`;
+}).join('\n')}
+
+TOP PERFORMING DISTRICTS:
+${districtPerformance.slice(0, 5).map(district => 
+    `- ${district.districtName}: Avg MMR: ${district.avgMMR.toFixed(1)}, Avg Institutional Births: ${district.avgInstitutionalBirths.toFixed(1)}%`
+).join('\n')}
+
+UNDERPERFORMING DISTRICTS:
+${districtPerformance.slice(-5).map(district => 
+    `- ${district.districtName}: Avg MMR: ${district.avgMMR.toFixed(1)}, Avg Institutional Births: ${district.avgInstitutionalBirths.toFixed(1)}%`
+).join('\n')}
+
+DISTRICT COMPARISON DATA:
+${districtPerformance.slice(0, 10).map(district => 
+    `District: ${district.districtName}, Blocks: ${district.blockCount}, Avg MMR: ${district.avgMMR.toFixed(1)}, Avg Institutional Births: ${district.avgInstitutionalBirths.toFixed(1)}%`
+).join('\n')}
+`;
+
+        return context;
+    }
+
+    calculateStateStats(data) {
+        const avgMMR = data.reduce((sum, d) => sum + (parseFloat(d['Maternal Mortality Ratio']) || 0), 0) / data.length;
+        const avgInstitutionalBirths = data.reduce((sum, d) => sum + (parseFloat(d['% of institutional births']) || 0), 0) / data.length;
+        const avgFullANC = data.reduce((sum, d) => sum + (parseFloat(d['% of Mothers who had full antenatal care']) || 0), 0) / data.length;
+        const totalDistricts = [...new Set(data.map(d => d['District Name']))].length;
+        
+        return { avgMMR, avgInstitutionalBirths, avgFullANC, totalDistricts };
+    }
+
+    analyzeDistrictPerformance(data) {
+        // Group data by district
+        const districtGroups = {};
+        data.forEach(record => {
+            const districtName = record['District Name'];
+            if (!districtGroups[districtName]) {
+                districtGroups[districtName] = [];
+            }
+            districtGroups[districtName].push(record);
+        });
+
+        // Calculate district-level averages
+        return Object.keys(districtGroups).map(districtName => {
+            const districtData = districtGroups[districtName];
+            const avgMMR = districtData.reduce((sum, d) => sum + (parseFloat(d['Maternal Mortality Ratio']) || 0), 0) / districtData.length;
+            const avgInstitutionalBirths = districtData.reduce((sum, d) => sum + (parseFloat(d['% of institutional births']) || 0), 0) / districtData.length;
+            const avgFullANC = districtData.reduce((sum, d) => sum + (parseFloat(d['% of Mothers who had full antenatal care']) || 0), 0) / districtData.length;
+            
+            return {
+                districtName,
+                blockCount: districtData.length,
+                avgMMR,
+                avgInstitutionalBirths,
+                avgFullANC
+            };
+        }).sort((a, b) => a.avgMMR - b.avgMMR); // Sort by MMR (lower is better)
+    }
+
+    prepareDistrictAnalysisContext(data, districtName, blockName, userQuery) {
         // Calculate district-level statistics
         const districtStats = this.calculateDistrictStats(data);
         
@@ -274,7 +453,7 @@ ${data.slice(0, 5).map(record =>
         }).sort((a, b) => a.rank - b.rank);
     }
 
-    async callLLMAPIStreaming(context, districtName, blockName) {
+    async callLLMAPIStreaming(context, districtName, blockName, isStateLevel = false) {
         // Get system prompt from textarea (or fallback)
         let systemPrompt = this.defaultSystemPrompt;
         const textarea = document.getElementById('system-prompt-textarea');
@@ -304,7 +483,7 @@ ${data.slice(0, 5).map(record =>
         }
 
         // Show results section and hide loading
-        this.showResultsSection(districtName, blockName);
+        this.showResultsSection(districtName, blockName, isStateLevel);
         this.hideLoading();
         
         // Process streaming response
@@ -331,7 +510,7 @@ ${data.slice(0, 5).map(record =>
                             
                             if (content) {
                                 accumulatedContent += content;
-                                this.updateStreamingResults(accumulatedContent, districtName, blockName);
+                                this.updateStreamingResults(accumulatedContent, districtName, blockName, isStateLevel);
                             }
                         } catch (e) {
                             // Ignore parsing errors for incomplete chunks
@@ -346,23 +525,31 @@ ${data.slice(0, 5).map(record =>
         }
     }
 
-    showResultsSection(districtName, blockName) {
+    showResultsSection(districtName, blockName, isStateLevel = false) {
         const resultsSection = document.getElementById('results-section');
         resultsSection.classList.remove('d-none');
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
 
-    updateStreamingResults(content, districtName, blockName) {
+    updateStreamingResults(content, districtName, blockName, isStateLevel = false) {
         const resultsContent = document.getElementById('results-content');
         
         if (resultsContent) {
             const htmlContent = marked.parse(content);
             
+            // Determine the title based on analysis level
+            let analysisTitle;
+            if (isStateLevel) {
+                analysisTitle = `Analysis for ${districtName} State`;
+            } else {
+                analysisTitle = `Analysis for ${districtName}${blockName ? ` - ${blockName} Block` : ' District'}`;
+            }
+            
             const template = html`
                 <div class="analysis-header mb-4">
                     <h5 class="text-primary">
                         <i class="bi bi-geo-alt-fill"></i>
-                        Analysis for ${districtName}${blockName ? ` - ${blockName} Block` : ''}
+                        ${analysisTitle}
                     </h5>
                     <p class="text-muted">Generated on ${new Date().toLocaleString()}</p>
                 </div>
