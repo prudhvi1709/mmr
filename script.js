@@ -41,6 +41,10 @@ Based on the available data, provide:
 6. **Ranking Analysis** showing current position and potential improvements if indicators are enhanced.
 
 Present insights in a human-readable, decision-friendly format that government officers can act upon immediately. Use bullet points, numbers, and clear recommendations. Be concise but comprehensive.`;
+        this.chatHistory = [];
+        this.chatCount = 0;
+        this.maxChats = 5;
+        this.currentContext = null;
         this.init();
     }
 
@@ -227,6 +231,12 @@ Present insights in a human-readable, decision-friendly format that government o
         // Prepare context for state-level LLM analysis
         const analysisContext = this.prepareStateAnalysisContext(stateData, userQuery);
         
+        // Store the context for future chat interactions
+        this.currentContext = this.summarizeContext(analysisContext, true);
+        
+        // Reset chat history for new analysis
+        this.resetChatHistory();
+        
         // Call LLM API with streaming
         await this.callLLMAPIStreaming(analysisContext, "Uttar Pradesh", null, true);
     }
@@ -249,6 +259,12 @@ Present insights in a human-readable, decision-friendly format that government o
 
         // Prepare context for LLM
         const analysisContext = this.prepareDistrictAnalysisContext(relevantData, districtName, blockName, userQuery);
+        
+        // Store the context for future chat interactions
+        this.currentContext = this.summarizeContext(analysisContext, false);
+        
+        // Reset chat history for new analysis
+        this.resetChatHistory();
         
         // Call LLM API with streaming
         await this.callLLMAPIStreaming(analysisContext, districtName, blockName, false);
@@ -453,6 +469,104 @@ ${data.slice(0, 5).map(record =>
         }).sort((a, b) => a.rank - b.rank);
     }
 
+    summarizeContext(fullContext, isStateLevel) {
+        // Extract key information from the full context for more efficient follow-up chats
+        const lines = fullContext.split('\n').filter(line => line.trim());
+        const summary = {};
+        
+        // Extract location info
+        if (isStateLevel) {
+            summary.location = "STATE: UTTAR PRADESH";
+            summary.analysisLevel = "STATE-WIDE";
+        } else {
+            const districtLine = lines.find(line => line.startsWith('District:'));
+            summary.location = districtLine || "District analysis";
+            
+            const blockLine = lines.find(line => line.startsWith('Specific Block:'));
+            if (blockLine) summary.specificBlock = blockLine;
+        }
+        
+        // Extract data summary
+        summary.dataSummary = [];
+        let inDataSummary = false;
+        for (const line of lines) {
+            if (line.includes('DATA SUMMARY:')) {
+                inDataSummary = true;
+                continue;
+            } else if (inDataSummary && line.startsWith('-')) {
+                summary.dataSummary.push(line);
+            } else if (inDataSummary && !line.startsWith('-')) {
+                inDataSummary = false;
+            }
+        }
+        
+        // Extract key indicators
+        summary.keyIndicators = [];
+        let inKeyIndicators = false;
+        for (const line of lines) {
+            if (line.includes('KEY INDICATORS ANALYSIS')) {
+                inKeyIndicators = true;
+                continue;
+            } else if (inKeyIndicators && line.startsWith('-')) {
+                summary.keyIndicators.push(line);
+            } else if (inKeyIndicators && !line.startsWith('-') && line.trim()) {
+                inKeyIndicators = false;
+            }
+        }
+        
+        // Extract top and underperforming areas
+        summary.topPerforming = [];
+        summary.underperforming = [];
+        
+        let inTopPerforming = false;
+        let inUnderperforming = false;
+        
+        for (const line of lines) {
+            if (line.includes('TOP PERFORMING')) {
+                inTopPerforming = true;
+                inUnderperforming = false;
+                continue;
+            } else if (line.includes('UNDERPERFORMING')) {
+                inTopPerforming = false;
+                inUnderperforming = true;
+                continue;
+            } else if (inTopPerforming && line.startsWith('-')) {
+                summary.topPerforming.push(line);
+            } else if (inUnderperforming && line.startsWith('-')) {
+                summary.underperforming.push(line);
+            } else if ((inTopPerforming || inUnderperforming) && !line.startsWith('-') && line.trim()) {
+                inTopPerforming = false;
+                inUnderperforming = false;
+            }
+        }
+        
+        // Format the summary as a string
+        let summaryText = `${summary.location}\n${summary.analysisLevel || ''}\n`;
+        
+        if (summary.specificBlock) {
+            summaryText += `${summary.specificBlock}\n`;
+        }
+        
+        summaryText += "\nDATA SUMMARY:\n";
+        summaryText += summary.dataSummary.slice(0, 3).join('\n') + '\n';
+        
+        summaryText += "\nKEY INDICATORS SUMMARY:\n";
+        summaryText += summary.keyIndicators.slice(0, 5).join('\n') + '\n';
+        
+        summaryText += "\nTOP PERFORMING AREAS:\n";
+        summaryText += summary.topPerforming.slice(0, 2).join('\n') + '\n';
+        
+        summaryText += "\nUNDERPERFORMING AREAS:\n";
+        summaryText += summary.underperforming.slice(0, 2).join('\n');
+        
+        return summaryText;
+    }
+
+    resetChatHistory() {
+        this.chatHistory = [];
+        this.chatCount = 0;
+    }
+
     async callLLMAPIStreaming(context, districtName, blockName, isStateLevel = false) {
         // Get system prompt from textarea (or fallback)
         let systemPrompt = this.defaultSystemPrompt;
@@ -525,6 +639,151 @@ ${data.slice(0, 5).map(record =>
             throw error;
         } finally {
             reader.releaseLock();
+        }
+        
+        // Add the initial response to chat history
+        const initialResponse = this.extractMainContent(accumulatedContent);
+        this.addToChatHistory('assistant', initialResponse);
+    }
+
+    extractMainContent(content) {
+        // Remove follow-up questions section for chat history
+        const followUpRegex = /FOLLOW-UP QUESTIONS:[\s\n]+((?:- .*\n?)+)/i;
+        return content.replace(followUpRegex, '').trim();
+    }
+
+    addToChatHistory(role, content) {
+        this.chatHistory.push({ role, content });
+        if (role === 'user') {
+            this.chatCount++;
+        }
+    }
+
+    async sendChatMessage(message) {
+        if (this.chatCount >= this.maxChats) {
+            this.showError("You've reached the maximum number of follow-up questions for this session. Please start a new analysis.");
+            return;
+        }
+        
+        if (!this.currentContext) {
+            this.showError("No analysis context available. Please run an analysis first.");
+            return;
+        }
+        
+        try {
+            this.showChatLoading();
+            
+            // Add user message to chat history
+            this.addToChatHistory('user', message);
+            
+            // Update chat UI immediately
+            this.updateChatUI();
+            
+            // Prepare context with summarized data and chat history
+            const chatContext = `${this.currentContext}\n\nCHAT HISTORY:\n${this.formatChatHistory()}\n\nUSER QUESTION: ${message}`;
+            
+            // Get system prompt
+            let systemPrompt = this.defaultSystemPrompt;
+            const textarea = document.getElementById('system-prompt-textarea');
+            if (textarea && textarea.value.trim()) {
+                systemPrompt = textarea.value.trim();
+            }
+            
+            // Call LLM API
+            const response = await fetch(`${this.apiConfig.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiConfig.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4.1-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: chatContext }
+                    ]
+                }),
+                stream: true
+            });
+            
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`API call failed: ${error}`);
+            }
+            
+            const result = await response.json();
+            const assistantResponse = result.choices[0].message.content;
+            
+            // Add assistant response to chat history
+            this.addToChatHistory('assistant', assistantResponse);
+            
+            // Update chat UI
+            this.updateChatUI();
+            
+            // Update remaining chats counter
+            this.updateRemainingChats();
+        } catch (error) {
+            this.showError("Failed to send message: " + error.message);
+        } finally {
+            this.hideChatLoading();
+        }
+    }
+    
+    formatChatHistory() {
+        return this.chatHistory.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n\n');
+    }
+    
+    updateChatUI() {
+        const chatContainer = document.getElementById('chat-container');
+        if (!chatContainer) return;
+        
+        // Clear existing messages
+        const chatMessages = document.getElementById('chat-messages');
+        
+        // Create template for chat messages
+        const template = html`
+            <div class="chat-messages" id="chat-messages">
+                ${this.chatHistory.map(msg => html`
+                    <div class="chat-message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}">
+                        <div class="message-content">
+                            ${unsafeHTML(marked.parse(msg.content))}
+                        </div>
+                    </div>
+                `)}
+            </div>
+        `;
+        
+        render(template, chatMessages);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    showChatLoading() {
+        const loadingIndicator = document.getElementById('chat-loading');
+        if (loadingIndicator) {
+            loadingIndicator.classList.remove('d-none');
+        }
+    }
+    
+    hideChatLoading() {
+        const loadingIndicator = document.getElementById('chat-loading');
+        if (loadingIndicator) {
+            loadingIndicator.classList.add('d-none');
+        }
+    }
+    
+    updateRemainingChats() {
+        const remainingChats = document.getElementById('remaining-chats');
+        if (remainingChats) {
+            const remaining = this.maxChats - this.chatCount;
+            remainingChats.textContent = `${remaining} of ${this.maxChats} follow-ups remaining`;
+            
+            if (remaining <= 1) {
+                remainingChats.classList.add('text-danger');
+            } else {
+                remainingChats.classList.remove('text-danger');
+            }
         }
     }
 
@@ -603,22 +862,295 @@ ${data.slice(0, 5).map(record =>
                         Janani Suraksha Yojana (JSY) data, and state health department records.
                     </small>
                 </div>
+                
+                <!-- Follow-up Questions Section -->
+                <div class="follow-up-section mt-4" id="follow-up-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="text-primary mb-0">
+                            <i class="bi bi-chat-dots"></i>
+                            Follow-up Questions
+                        </h6>
+                        <span class="badge bg-secondary" id="remaining-chats">${this.maxChats} of ${this.maxChats} follow-ups remaining</span>
+                    </div>
+                    
+                    <div id="follow-up-conversations">
+                        <!-- Follow-up conversations will be appended here -->
+                    </div>
+                    
+                    <div id="follow-up-loading" class="text-center py-3 d-none">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="ms-2">Processing...</span>
+                    </div>
+                    
+                    <div class="follow-up-input mt-3">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="follow-up-input" 
+                                placeholder="Type your follow-up question here..." 
+                                ${this.chatCount >= this.maxChats ? 'disabled' : ''}>
+                            <button class="btn btn-primary" id="follow-up-send-btn" 
+                                ${this.chatCount >= this.maxChats ? 'disabled' : ''}>
+                                <i class="bi bi-send"></i> Ask
+                            </button>
+                        </div>
+                        <small class="text-muted mt-1">
+                            You can ask up to ${this.maxChats} follow-up questions about the analysis results
+                        </small>
+                    </div>
+                </div>
             `;
             
             render(template, resultsContent);
+            
+            // Setup follow-up input event listeners
+            this.setupFollowUpEventListeners();
         }
     }
     
+    setupFollowUpEventListeners() {
+        const followUpInput = document.getElementById('follow-up-input');
+        const sendButton = document.getElementById('follow-up-send-btn');
+        
+        if (!followUpInput || !sendButton) return;
+        
+        // Send on button click
+        sendButton.addEventListener('click', () => {
+            const message = followUpInput.value.trim();
+            if (message) {
+                this.sendFollowUpQuestion(message);
+                followUpInput.value = '';
+            }
+        });
+        
+        // Send on Enter key
+        followUpInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const message = followUpInput.value.trim();
+                if (message) {
+                    this.sendFollowUpQuestion(message);
+                    followUpInput.value = '';
+                }
+                e.preventDefault();
+            }
+        });
+    }
+
     handleFollowUpClick(event, question) {
-        // Set the question in the user query input
-        const userQueryInput = document.getElementById('user-query');
-        if (userQueryInput) {
-            userQueryInput.value = question;
+        // Send the follow-up question
+        this.sendFollowUpQuestion(question);
+    }
+    
+    async sendFollowUpQuestion(question) {
+        if (this.chatCount >= this.maxChats) {
+            this.showError("You've reached the maximum number of follow-up questions for this session. Please start a new analysis.");
+            return;
+        }
+        
+        if (!this.currentContext) {
+            this.showError("No analysis context available. Please run an analysis first.");
+            return;
+        }
+        
+        try {
+            this.showFollowUpLoading();
             
-            // Get the form and submit it automatically
-            const form = document.getElementById('analysis-form');
-            if (form) {
-                form.dispatchEvent(new Event('submit', { cancelable: true }));
+            // Add user message to chat history
+            this.addToChatHistory('user', question);
+            
+            // Append the user question to the follow-up section
+            this.appendFollowUpQuestion(question);
+            
+            // Prepare context with summarized data and chat history
+            const chatContext = `${this.currentContext}\n\nCHAT HISTORY:\n${this.formatChatHistory()}\n\nUSER QUESTION: ${question}`;
+            
+            // Get system prompt
+            let systemPrompt = this.defaultSystemPrompt;
+            const textarea = document.getElementById('system-prompt-textarea');
+            if (textarea && textarea.value.trim()) {
+                systemPrompt = textarea.value.trim();
+            }
+            
+            // Call LLM API with streaming
+            const response = await fetch(`${this.apiConfig.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiConfig.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4.1-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: chatContext }
+                    ],
+                    stream: true
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`API call failed: ${error}`);
+            }
+            
+            // Create a placeholder for the response
+            const responseId = this.appendFollowUpResponsePlaceholder();
+            
+            // Process streaming response
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.trim() && line.startsWith('data: ')) {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(dataStr);
+                                const content = parsed.choices?.[0]?.delta?.content;
+                                
+                                if (content) {
+                                    accumulatedContent += content;
+                                    this.updateFollowUpResponse(responseId, accumulatedContent);
+                                }
+                            } catch (e) {
+                                // Ignore parsing errors for incomplete chunks
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                throw error;
+            } finally {
+                reader.releaseLock();
+            }
+            
+            // Add assistant response to chat history
+            this.addToChatHistory('assistant', accumulatedContent);
+            
+            // Update remaining chats counter
+            this.updateRemainingChats();
+        } catch (error) {
+            this.showError("Failed to send message: " + error.message);
+        } finally {
+            this.hideFollowUpLoading();
+        }
+    }
+    
+    appendFollowUpQuestion(question) {
+        const followUpConversations = document.getElementById('follow-up-conversations');
+        if (!followUpConversations) return;
+        
+        const questionElement = document.createElement('div');
+        questionElement.className = 'follow-up-item user-question mb-3';
+        
+        questionElement.innerHTML = `
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-person-fill"></i> Your Question
+                </div>
+                <div class="card-body">
+                    <p class="card-text">${question}</p>
+                </div>
+            </div>
+        `;
+        
+        followUpConversations.appendChild(questionElement);
+        
+        // Scroll to the question
+        questionElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    
+    appendFollowUpResponsePlaceholder() {
+        const followUpConversations = document.getElementById('follow-up-conversations');
+        if (!followUpConversations) return null;
+        
+        const responseId = 'response-' + Date.now();
+        const responseElement = document.createElement('div');
+        responseElement.className = 'follow-up-item assistant-response mb-4';
+        responseElement.id = responseId;
+        
+        responseElement.innerHTML = `
+            <div class="card">
+                <div class="card-header bg-light">
+                    <i class="bi bi-robot"></i> Response
+                </div>
+                <div class="card-body">
+                    <div class="card-text" id="${responseId}-content">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-12"></span>
+                            <span class="placeholder col-10"></span>
+                            <span class="placeholder col-8"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        followUpConversations.appendChild(responseElement);
+        
+        // Scroll to the response
+        responseElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        
+        return responseId;
+    }
+    
+    updateFollowUpResponse(responseId, content) {
+        if (!responseId) return;
+        
+        const responseContent = document.getElementById(`${responseId}-content`);
+        if (responseContent) {
+            responseContent.innerHTML = marked.parse(content);
+        }
+    }
+    
+    appendFollowUpResponse(response) {
+        // This method is no longer used since we're using streaming responses
+    }
+    
+    showFollowUpLoading() {
+        const loadingIndicator = document.getElementById('follow-up-loading');
+        if (loadingIndicator) {
+            loadingIndicator.classList.remove('d-none');
+        }
+    }
+    
+    hideFollowUpLoading() {
+        const loadingIndicator = document.getElementById('follow-up-loading');
+        if (loadingIndicator) {
+            loadingIndicator.classList.add('d-none');
+        }
+    }
+    
+    updateRemainingChats() {
+        const remainingChats = document.getElementById('remaining-chats');
+        if (remainingChats) {
+            const remaining = this.maxChats - this.chatCount;
+            remainingChats.textContent = `${remaining} of ${this.maxChats} follow-ups remaining`;
+            
+            if (remaining <= 1) {
+                remainingChats.classList.add('text-danger');
+            } else {
+                remainingChats.classList.remove('text-danger');
+            }
+            
+            // Disable input if no remaining chats
+            const followUpInput = document.getElementById('follow-up-input');
+            const sendButton = document.getElementById('follow-up-send-btn');
+            
+            if (followUpInput && sendButton) {
+                if (remaining <= 0) {
+                    followUpInput.disabled = true;
+                    sendButton.disabled = true;
+                    followUpInput.placeholder = "Maximum follow-up questions reached";
+                }
             }
         }
     }
