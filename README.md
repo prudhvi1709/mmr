@@ -1,194 +1,81 @@
 # District Health Performance Analyzer
 
-A web application designed to help Indian government officers understand and improve their district's public health performance through AI-powered analysis.
+A web application designed to help government administrators in Uttar Pradesh, India analyze health data, identify critical issues, compare performance across districts and blocks, and develop targeted interventions to improve public health outcomes.
 
-## 🏥 Features
+## Features
 
-- **Data Loading**: Load health indicator data from CSV files
-- **AI Analysis**: Use LLM APIs to analyze health performance and provide actionable insights
-- **District Focus**: Analyze specific districts and blocks in Uttar Pradesh
-- **Performance Comparison**: Compare block-wise performance within districts
-- **Actionable Insights**: Get specific recommendations for improving health outcomes
-- **What-if Simulations**: Understand potential impact of interventions
+- **Multi-level Analysis**
+  - State-level analysis across all districts in Uttar Pradesh
+  - District-level analysis with detailed block-wise breakdowns
+  - Optional block-specific focus for targeted interventions
 
-## 🚀 Quick Start
+- **Interactive Health Data Exploration**
+  - Performance comparison across geographic units
+  - Identification of top-performing and underperforming areas
+  - Key health indicator analysis and ranking
 
-1. **Clone or download** this repository
-2. **Open `index.html`** in a modern web browser
-3. **Configure LLM API** by clicking "Configure LLM API" button
-4. **Load sample data** by clicking "Load Sample Data" button
-5. **Enter your query** and analyze district health performance
+- **AI-Powered Insights**
+  - Actionable recommendations based on data patterns
+  - What-if simulations for potential interventions
+  - Root cause analysis beyond available data points
 
-## 📊 Sample Data
+- **Interactive Follow-up System**
+  - Ask up to 5 follow-up questions about analysis results
+  - Contextual responses based on previous analysis
+  - Drill-down capabilities for deeper understanding
 
-The application includes sample health data (`data.csv`) with the following key indicators:
+## Project Structure
 
-- Maternal Mortality Ratio (MMR)
-- Institutional birth percentages
-- Antenatal care coverage
-- Janani Suraksha Yojana (JSY) implementation
-- Iron and folic acid supplementation
-- Block-wise performance rankings
+The application follows a modular architecture for better maintainability:
 
-## 🔧 API Configuration
+- `index.html` - Main HTML structure and UI components
+- `script.js` - Application entry point and core functionality
+- `config.js` - Configuration settings and system prompts
+- `data.js` - Data loading, parsing, and statistical analysis
+- `api.js` - LLM API communication and chat management
+- `analysis.js` - Health data context preparation and analysis
+- `ui.js` - User interface rendering and interaction handling
+- `data.csv` - Sample health data for Uttar Pradesh districts
 
-The app supports multiple LLM providers:
+## Setup and Usage
 
-- **OpenAI** (GPT models)
-- **OpenRouter** (Multiple model access)
-- **Anthropic** (Claude models)
-- **Custom providers** (Any OpenAI-compatible API)
+1. Open `index.html` in a web browser
+2. Click "Configure LLM API" to set up your API credentials
+   - The application uses bootstrap-llm-provider for API configuration
+3. Click "Load Sample Data" to import the health data from data.csv
+4. Select analysis level (State or District)
+   - For district-level analysis, select a specific district and optionally a block
+5. Enter your query about health issues (e.g., "How can we reduce maternal mortality in Agra?")
+6. View analysis results with visualizations and recommendations
+7. Ask follow-up questions for deeper insights
 
-### Setup Steps:
+## Technologies Used
 
-1. Click "Configure LLM API"
-2. Select your provider's base URL
-3. Enter your API key
-4. The app will test connectivity and save your settings
+- **Frontend**
+  - Modern JavaScript (ES6+)
+  - Bootstrap 5 for responsive UI components
+  - lit-html for efficient templating and rendering
 
-## 📝 Usage Examples
+- **Data Processing**
+  - Custom CSV parsing and statistical analysis
+  - Functional programming approach for data transformations
 
-### Example Queries:
+- **AI Integration**
+  - OpenAI API for analysis and insights
+  - Streaming responses for better user experience
+  - Context-aware follow-up capabilities
 
-1. **"I want to reduce maternal mortality rate in Agra, Uttar Pradesh"**
-   - Analyzes MMR-related indicators
-   - Identifies underperforming blocks
-   - Suggests specific interventions
+## Development
 
-2. **"How can we improve institutional delivery rates in Aligarh?"**
-   - Focuses on delivery-related metrics
-   - Compares with best-performing blocks
-   - Provides actionable recommendations
+The application is built with the following principles:
 
-3. **"What are the main health challenges in Fatehabad block?"**
-   - Block-specific analysis
-   - Identifies key weak areas
-   - Suggests targeted interventions
+- Modular organization with single-responsibility files
+- Functional programming approach with minimal state management
+- Early validation with if-return pattern for robust error handling
+- Configuration separated from code for easy customization
+- Comprehensive error handling with user-friendly notifications
+- Persistent form state using saveform library
 
-## 🎯 Key Health Indicators
+## License
 
-The application analyzes multiple health indicators:
-
-### Maternal Health
-- Maternal Mortality Ratio
-- Institutional births percentage
-- Full antenatal care coverage
-- Iron and folic acid supplementation
-- Postnatal care within 48 hours
-
-### Program Implementation
-- Janani Suraksha Yojana (JSY) coverage
-- Free transport facility utilization
-- JSSK (Janani Shishu Suraksha Karyakram) implementation
-- ASHA worker engagement
-
-### Quality Metrics
-- C-section delivery rates
-- Ultrasound coverage
-- Blood transfusion availability
-- Complaint resolution rates
-
-## 🔍 Analysis Features
-
-### 1. **Relevant Indicators**
-- Identifies key metrics tied to your specific problem
-- Links to national programs (NHM, Aspirational Districts, NITI Aayog)
-
-### 2. **Performance Ranking**
-- Shows district performance across the state
-- Compares with similar districts
-
-### 3. **Block-wise Breakdown**
-- Identifies best and worst performing blocks
-- Highlights specific areas needing attention
-
-### 4. **Actionable Suggestions**
-- Specific, measurable recommendations
-- Target improvements with realistic timelines
-
-### 5. **Impact Predictions**
-- Estimates ranking improvements from interventions
-- Provides "what-if" scenarios
-
-### 6. **Root Cause Analysis**
-- Considers factors beyond the data
-- Addresses social, infrastructure, and systemic issues
-
-## 🛠️ Technical Details
-
-### Technologies Used
-- **Frontend**: HTML5, CSS3 (Bootstrap 5), JavaScript ES6
-- **Data Processing**: CSV parsing and analysis
-- **AI Integration**: OpenAI-compatible APIs
-- **Form Persistence**: saveform library
-- **API Configuration**: bootstrap-llm-provider
-
-### File Structure
-```
-├── index.html          # Main application interface
-├── app.js              # Core JavaScript functionality
-├── data.csv            # Sample health data
-├── README.md           # This documentation
-└── .gitignore          # Git ignore rules
-```
-
-### Browser Requirements
-- Modern browser with ES6 support
-- JavaScript enabled
-- Internet connection for LLM API calls
-
-## 📋 Data Format
-
-The CSV data should include these key columns:
-
-- `District Name`: Name of the district
-- `Development Block Name`: Name of the block
-- `Block Rank`: Performance ranking
-- `Maternal Mortality Ratio`: MMR value
-- `% of institutional births`: Institutional delivery percentage
-- `% of Mothers who had full antenatal care`: ANC coverage
-- Additional health indicators as per requirement
-
-## 🎨 User Interface
-
-The application features a clean, government-friendly interface:
-
-- **Bootstrap-based design** for professional appearance
-- **Responsive layout** works on desktop and mobile
-- **Clear error handling** with user-friendly messages
-- **Loading indicators** for better user experience
-- **Form persistence** saves your inputs automatically
-
-## 🔒 Privacy & Security
-
-- **Local processing**: Data analysis happens in your browser
-- **No data storage**: CSV data is not sent to external servers
-- **API key security**: Your LLM API keys are stored locally
-- **HTTPS recommended**: Use HTTPS for production deployments
-
-## 🤝 Contributing
-
-To contribute to this project:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📞 Support
-
-For technical support or questions:
-
-- Check the browser console for error messages
-- Verify your API configuration
-- Ensure data.csv is in the correct format
-- Test with a different LLM provider if needed
-
-## 📄 License
-
-This project is designed for government use in improving public health outcomes. Please ensure compliance with relevant data protection and government IT policies.
-
----
-
-**Built for Indian government officers to make data-driven decisions in public health.** 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
