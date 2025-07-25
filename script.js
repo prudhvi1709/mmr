@@ -461,6 +461,9 @@ ${data.slice(0, 5).map(record =>
             systemPrompt = textarea.value.trim();
         }
         
+        // Add request for follow-up questions to the context
+        context += "\n\nPlease suggest 3-5 follow-up questions that would be relevant to this analysis at the end of your response, formatted as a section titled 'FOLLOW-UP QUESTIONS:' with each question on a new line starting with '- '";
+        
         const response = await fetch(`${this.apiConfig.baseURL}/chat/completions`, {
             method: 'POST',
             headers: {
@@ -535,7 +538,25 @@ ${data.slice(0, 5).map(record =>
         const resultsContent = document.getElementById('results-content');
         
         if (resultsContent) {
-            const htmlContent = marked.parse(content);
+            // Process the content to extract follow-up questions
+            let mainContent = content;
+            let followUpQuestions = [];
+            
+            // Check if there's a follow-up questions section
+            const followUpRegex = /FOLLOW-UP QUESTIONS:[\s\n]+((?:- .*\n?)+)/i;
+            const match = content.match(followUpRegex);
+            
+            if (match) {
+                // Extract questions and remove them from main content for separate display
+                followUpQuestions = match[1].split('\n')
+                    .filter(line => line.trim().startsWith('- '))
+                    .map(line => line.trim().substring(2).trim());
+                
+                // Remove the follow-up section from the main content
+                mainContent = content.replace(followUpRegex, '').trim();
+            }
+            
+            const htmlContent = marked.parse(mainContent);
             
             // Determine the title based on analysis level
             let analysisTitle;
@@ -558,6 +579,23 @@ ${data.slice(0, 5).map(record =>
                     ${unsafeHTML(htmlContent)}
                 </div>
                 
+                ${followUpQuestions.length > 0 ? html`
+                    <div class="follow-up-questions mt-4">
+                        <h6 class="text-primary">
+                            <i class="bi bi-question-circle"></i>
+                            Follow-up Questions
+                        </h6>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            ${followUpQuestions.map(question => html`
+                                <button class="btn btn-outline-primary btn-sm follow-up-btn" 
+                                        @click=${(e) => this.handleFollowUpClick(e, question)}>
+                                    ${question}
+                                </button>
+                            `)}
+                        </div>
+                    </div>
+                ` : ''}
+                
                 <div class="mt-4 p-3 bg-light rounded">
                     <small class="text-muted">
                         <i class="bi bi-info-circle"></i>
@@ -568,6 +606,20 @@ ${data.slice(0, 5).map(record =>
             `;
             
             render(template, resultsContent);
+        }
+    }
+    
+    handleFollowUpClick(event, question) {
+        // Set the question in the user query input
+        const userQueryInput = document.getElementById('user-query');
+        if (userQueryInput) {
+            userQueryInput.value = question;
+            
+            // Get the form and submit it automatically
+            const form = document.getElementById('analysis-form');
+            if (form) {
+                form.dispatchEvent(new Event('submit', { cancelable: true }));
+            }
         }
     }
 
