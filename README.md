@@ -65,16 +65,22 @@ The application follows a modular architecture for better maintainability:
   - Streaming responses for better user experience
   - Context-aware follow-up capabilities
 
-## Development
+## Requirements
 
-The application is built with the following principles:
+- Modern web browser (Chrome, Firefox, Edge, etc.)
+- No server setup required; runs fully client-side
 
-- Modular organization with single-responsibility files
-- Functional programming approach with minimal state management
-- Early validation with if-return pattern for robust error handling
-- Configuration separated from code for easy customization
-- Comprehensive error handling with user-friendly notifications
-- Persistent form state using saveform library
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request for improvements or bug fixes.
+
+## Support
+
+For questions or support, please open an issue on GitHub.
+
+## Acknowledgments
+
+If you used any third-party resources, datasets, or libraries, acknowledge them.
 
 ## License
 
