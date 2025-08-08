@@ -102,27 +102,17 @@ export function analyzeBlockPerformance(data, keyIndicators) {
     const fullANC = parseFloat(record['% of Mothers who had full antenatal care']) || 0;
     const rank = parseInt(record['Block Rank']) || 999;
 
-    // Identify strengths and weaknesses
-    const strengths = [];
-    const weaknesses = [];
-
-    if (institutionalBirths > 85) strengths.push('High institutional births');
-    else if (institutionalBirths < 70) weaknesses.push('Low institutional births');
-
-    if (fullANC > 80) strengths.push('Good ANC coverage');
-    else if (fullANC < 70) weaknesses.push('Poor ANC coverage');
-
-    if (mmr < 120) strengths.push('Low MMR');
-    else if (mmr > 160) weaknesses.push('High MMR');
-
     return {
       blockName: record['Development Block Name'],
       rank,
       mmr,
       institutionalBirths,
       fullANC,
-      strengths,
-      weaknesses
+      indicators: {
+        'Maternal Mortality Ratio': mmr,
+        '% of institutional births': institutionalBirths,
+        '% of Mothers who had full antenatal care': fullANC
+      }
     };
   }).sort((a, b) => a.rank - b.rank);
 } 

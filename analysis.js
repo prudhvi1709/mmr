@@ -22,36 +22,31 @@ Analysis Level: STATE-WIDE
 
 USER PROBLEM: "${userQuery}"
 
-STATE-WIDE DATA SUMMARY:
+CURRENT SITUATION:
 - Total districts analyzed: ${stateStats.totalDistricts}
 - Total blocks analyzed: ${data.length}
 - State average Maternal Mortality Ratio: ${stateStats.avgMMR.toFixed(1)}
 - State average Institutional Births: ${stateStats.avgInstitutionalBirths.toFixed(1)}%
 - State average Full ANC: ${stateStats.avgFullANC.toFixed(1)}%
 
-KEY INDICATORS ANALYSIS (STATE-WIDE):
+DISTRICT RANKING ANALYSIS:
+${districtPerformance.map((district, index) => 
+  `${index + 1}. ${district.districtName}: Rank ${index + 1} out of ${stateStats.totalDistricts} districts, MMR: ${district.avgMMR.toFixed(1)}, Institutional Births: ${district.avgInstitutionalBirths.toFixed(1)}%`
+).join('\n')}
+
+INDICATOR-WISE DISTRICT PERFORMANCE:
 ${KEY_INDICATORS.map(indicator => {
-  const values = data.map(d => parseFloat(d[indicator]) || 0);
-  const avg = values.reduce((a, b) => a + b, 0) / values.length;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  return `- ${indicator}: State Avg: ${avg.toFixed(1)}%, Range: ${min.toFixed(1)}% - ${max.toFixed(1)}%`;
+  const districtValues = districtPerformance.map(district => ({
+    name: district.districtName,
+    value: indicator === 'Maternal Mortality Ratio' ? district.avgMMR : 
+           indicator === '% of institutional births' ? district.avgInstitutionalBirths : 
+           district.avgFullANC
+  })).sort((a, b) => indicator === 'Maternal Mortality Ratio' ? a.value - b.value : b.value - a.value);
+  
+  return `\n${indicator}:
+${districtValues.slice(0, 5).map((d, i) => `  Rank ${i + 1}: ${d.name} (${d.value.toFixed(1)}${indicator === 'Maternal Mortality Ratio' ? '' : '%'})`).join('\n')}
+  Districts needing attention: ${districtValues.slice(-3).map(d => `${d.name} (Rank ${districtValues.length - districtValues.indexOf(d)}, Value: ${d.value.toFixed(1)}${indicator === 'Maternal Mortality Ratio' ? '' : '%'})`).join(', ')}`;
 }).join('\n')}
-
-TOP PERFORMING DISTRICTS:
-${districtPerformance.slice(0, 5).map(district => 
-  `- ${district.districtName}: Avg MMR: ${district.avgMMR.toFixed(1)}, Avg Institutional Births: ${district.avgInstitutionalBirths.toFixed(1)}%`
-).join('\n')}
-
-UNDERPERFORMING DISTRICTS:
-${districtPerformance.slice(-5).map(district => 
-  `- ${district.districtName}: Avg MMR: ${district.avgMMR.toFixed(1)}, Avg Institutional Births: ${district.avgInstitutionalBirths.toFixed(1)}%`
-).join('\n')}
-
-DISTRICT COMPARISON DATA:
-${districtPerformance.slice(0, 10).map(district => 
-  `District: ${district.districtName}, Blocks: ${district.blockCount}, Avg MMR: ${district.avgMMR.toFixed(1)}, Avg Institutional Births: ${district.avgInstitutionalBirths.toFixed(1)}%`
-).join('\n')}
 `;
 
   return context;
@@ -80,40 +75,40 @@ ${blockName ? `Specific Block: ${blockName}` : 'All Blocks Analysis'}
 
 USER PROBLEM: "${userQuery}"
 
-AVAILABLE DATA SUMMARY:
-- Total blocks analyzed: ${data.length}
-- District average Maternal Mortality Ratio: ${districtStats.avgMMR.toFixed(1)}
+CURRENT SITUATION:
+Maternal Mortality Rate for ${districtName} district is ${districtStats.avgMMR.toFixed(1)}. This district has ${data.length} blocks.
+- District average Maternal Mortality Ratio: ${districtStats.avgMMR.toFixed(1)} 
 - District average Institutional Births: ${districtStats.avgInstitutionalBirths.toFixed(1)}%
 - District average Full ANC: ${districtStats.avgFullANC.toFixed(1)}%
 
-KEY INDICATORS ANALYSIS:
-${KEY_INDICATORS.map(indicator => {
-  const values = data.map(d => parseFloat(d[indicator]) || 0);
-  const avg = values.reduce((a, b) => a + b, 0) / values.length;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  return `- ${indicator}: Avg: ${avg.toFixed(1)}%, Range: ${min.toFixed(1)}% - ${max.toFixed(1)}%`;
-}).join('\n')}
+BACKGROUND:
+From the available data, maternal mortality rate depends on factors such as institutional births, antenatal care coverage, and other socio-economic factors. These are some of the indicators available in our dataset:
 
-BLOCK-WISE PERFORMANCE:
-${blockPerformance.map(block => 
-  `- ${block.blockName} (Rank: ${block.rank}): MMR: ${block.mmr}, Institutional Births: ${block.institutionalBirths}%`
+INDICATOR-WISE BLOCK ANALYSIS:
+
+MATERNAL MORTALITY RATIO - Block-wise Ranking:
+${data.map((record, index) => 
+  `${index + 1}. ${record['Development Block Name']}: MMR ${record['Maternal Mortality Ratio']}, Block Rank ${record['Block Rank'] || 'N/A'} within district`
 ).join('\n')}
 
-TOP PERFORMING BLOCKS:
-${blockPerformance.slice(0, 3).map(block => 
-  `- ${block.blockName}: MMR: ${block.mmr}, Strong areas: ${block.strengths.join(', ')}`
-).join('\n')}
+INSTITUTIONAL BIRTHS - Block-wise Performance:
+${data.map((record, index) => {
+  const value = parseFloat(record['% of institutional births']) || 0;
+  return `${index + 1}. ${record['Development Block Name']}: ${value.toFixed(1)}%, Rank within district: ${index + 1}`;
+}).sort((a, b) => parseFloat(b.split(': ')[1]) - parseFloat(a.split(': ')[1])).join('\n')}
+Blocks needing attention for institutional births: ${data.filter(r => (parseFloat(r['% of institutional births']) || 0) < districtStats.avgInstitutionalBirths).map(r => r['Development Block Name']).join(', ')}
 
-UNDERPERFORMING BLOCKS:
-${blockPerformance.slice(-3).map(block => 
-  `- ${block.blockName}: MMR: ${block.mmr}, Weak areas: ${block.weaknesses.join(', ')}`
-).join('\n')}
+ANTENATAL CARE - Block-wise Performance:
+${data.map((record, index) => {
+  const value = parseFloat(record['% of Mothers who had full antenatal care']) || 0;
+  return `${index + 1}. ${record['Development Block Name']}: ${value.toFixed(1)}%, Rank within district: ${index + 1}`;
+}).sort((a, b) => parseFloat(b.split(': ')[1]) - parseFloat(a.split(': ')[1])).join('\n')}
+Blocks needing attention for ANC coverage: ${data.filter(r => (parseFloat(r['% of Mothers who had full antenatal care']) || 0) < districtStats.avgFullANC).map(r => r['Development Block Name']).join(', ')}
 
-DETAILED BLOCK DATA:
-${data.slice(0, 5).map(record => 
-  `Block: ${record['Development Block Name']}, Rank: ${record['Block Rank']}, MMR: ${record['Maternal Mortality Ratio']}, Institutional Births: ${record['% of institutional births']}%`
-).join('\n')}
+FOCUS AREAS BY INDICATOR:
+- For Maternal Mortality Rate: Focus on blocks ranking in bottom quartile
+- For Institutional Births: Intervention required in blocks: ${data.filter(r => (parseFloat(r['% of institutional births']) || 0) < districtStats.avgInstitutionalBirths).map(r => r['Development Block Name']).join(', ')}
+- For ANC Coverage: Intervention required in blocks: ${data.filter(r => (parseFloat(r['% of Mothers who had full antenatal care']) || 0) < districtStats.avgFullANC).map(r => r['Development Block Name']).join(', ')}
 `;
 
   return context;
