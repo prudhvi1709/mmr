@@ -1,10 +1,10 @@
 import saveform from "https://cdn.jsdelivr.net/npm/saveform@1.2";
 import { DEFAULT_SYSTEM_PROMPT } from './config.js';
-import { parseCSV } from './data.js';
-import { loadLLMConfig, callLLMAPIStreaming, extractMainContent, createChatManager } from './api.js';
+import { parseCSV, extractDistrictNames, findBestDistrictMatch } from './data.js';
+import { loadLLMConfig, callLLMAPIStreaming, extractMainContent, createChatManager, callLLMAPI } from './api.js';
 import { 
   showLoading, hideLoading, showError, showSuccess, updateDataStatus, 
-  populateDistrictDropdown, setupAnalysisLevelToggle, setupSystemPromptUI,
+  setupAnalysisLevelToggle, setupSystemPromptUI,
   showResultsSection, updateStreamingResults, setupFollowUpEventListeners,
   showFollowUpLoading, hideFollowUpLoading, appendFollowUpQuestion,
   appendFollowUpResponsePlaceholder, updateFollowUpResponse, updateRemainingChats
@@ -14,6 +14,7 @@ import { prepareStateAnalysisContext, prepareDistrictAnalysisContext, summarizeC
 // Global state
 let data = [];
 let apiConfig = null;
+let districtNames = [];
 const chatManager = createChatManager();
 
 /**
@@ -76,8 +77,8 @@ async function loadSampleData() {
     const csvText = await response.text();
     data = parseCSV(csvText);
     
-    // Populate district dropdown
-    populateDistrictDropdown(data);
+    // Extract district names for fuzzy matching
+    districtNames = extractDistrictNames(data);
     
     updateDataStatus(`Loaded ${data.length} records from sample data`);
     showSuccess(`Successfully loaded ${data.length} health records!`);
@@ -113,8 +114,6 @@ async function handleAnalysis(event) {
 
   const formData = new FormData(event.target);
   const analysisLevel = formData.get('analysis-level');
-  const districtName = formData.get('district-name');
-  const blockName = formData.get('block-name');
   const userQuery = formData.get('user-query');
 
   if (!userQuery) {
@@ -122,10 +121,26 @@ async function handleAnalysis(event) {
     return;
   }
 
-  // Validate based on analysis level
-  if (analysisLevel === 'district' && !districtName) {
-    showError("Please select a district for district-level analysis.");
-    return;
+  let districtName = null;
+  let blockName = null;
+
+  // For district-level analysis, use LLM to extract district name
+  if (analysisLevel === 'district') {
+    try {
+      showLoading("Identifying district from your query...");
+      districtName = await extractDistrictNameWithLLM(userQuery, districtNames, apiConfig);
+      if (!districtName) {
+        showError("Could not identify a district name in your query. Please mention a district name from Uttar Pradesh.");
+        hideLoading();
+        return;
+      }
+      // Show which district was identified
+      showSuccess(`Analyzing data for: ${districtName}`);
+    } catch (error) {
+      showError("Failed to identify district: " + error.message);
+      hideLoading();
+      return;
+    }
   }
 
   try {
@@ -307,6 +322,48 @@ async function sendFollowUpQuestion(question) {
     showError("Failed to send message: " + error.message);
   } finally {
     hideFollowUpLoading();
+  }
+}
+
+/**
+ * Extract district name from user query using LLM
+ * @param {string} userQuery - User's query text
+ * @param {Array} districtNames - Array of available district names
+ * @param {Object} apiConfig - API configuration
+ * @returns {Promise<string|null>} Extracted district name or null
+ */
+async function extractDistrictNameWithLLM(userQuery, districtNames, apiConfig) {
+  const systemPrompt = `You are a helper that extracts district names from user queries about health data analysis in Uttar Pradesh, India.
+
+Your task is to:
+1. Identify any district name mentioned in the user's query
+2. Match it to the exact district name from the provided list
+3. Handle typos and variations (e.g., "Aghra" should match "Agra")
+4. Return ONLY the exact district name from the list, or "NONE" if no valid district is found
+
+Available districts: ${districtNames.join(', ')}
+
+Rules:
+- Return only the exact district name from the list above
+- If you find a close match despite typos, return the correct spelling
+- If no district is mentioned or found, return "NONE"
+- Do not return any explanation, just the district name or "NONE"`;
+
+  const userPrompt = `Extract the district name from this query: "${userQuery}"`;
+  
+  try {
+    const response = await callLLMAPI(apiConfig, systemPrompt, userPrompt);
+    const extractedDistrict = response.trim();
+    
+    // Validate that the response is in our district list
+    if (extractedDistrict === "NONE" || !districtNames.includes(extractedDistrict)) {
+      return null;
+    }
+    
+    return extractedDistrict;
+  } catch (error) {
+    console.error('Error extracting district name:', error);
+    throw error;
   }
 }
 

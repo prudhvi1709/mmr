@@ -58,30 +58,6 @@ export function updateDataStatus(message) {
   document.getElementById('data-status-text').textContent = message;
 }
 
-/**
- * Populate district dropdown with options
- * @param {Array} data - Array of data records
- */
-export function populateDistrictDropdown(data) {
-  const districtSelect = document.getElementById('district-name');
-  if (!districtSelect) return;
-
-  // Extract unique districts from data
-  const districts = [...new Set(data.map(record => record['District Name']))].sort();
-  
-  // Clear existing options except the first one
-  districtSelect.innerHTML = '<option value="">Select a district...</option>';
-  
-  // Add district options
-  districts.forEach(district => {
-    if (district && district.trim()) {
-      const option = document.createElement('option');
-      option.value = district;
-      option.textContent = district;
-      districtSelect.appendChild(option);
-    }
-  });
-}
 
 /**
  * Setup analysis level toggle behavior
@@ -89,19 +65,13 @@ export function populateDistrictDropdown(data) {
 export function setupAnalysisLevelToggle() {
   const stateRadio = document.getElementById('state-level');
   const districtRadio = document.getElementById('district-level');
-  const districtSelection = document.getElementById('district-selection');
-  const districtSelect = document.getElementById('district-name');
   const userQueryTextarea = document.getElementById('user-query');
 
   // Handle toggle changes
   const handleToggleChange = () => {
     if (districtRadio.checked) {
-      districtSelection.style.display = 'block';
-      districtSelect.setAttribute('required', 'required');
       userQueryTextarea.placeholder = "e.g., I want to reduce maternal mortality rate in Agra district";
     } else {
-      districtSelection.style.display = 'none';
-      districtSelect.removeAttribute('required');
       userQueryTextarea.placeholder = "e.g., I want to reduce maternal mortality rate in Uttar Pradesh";
     }
   };
@@ -174,6 +144,15 @@ export function updateStreamingResults(content, districtName, blockName, isState
   
   const htmlContent = marked.parse(mainContent);
   
+  // Add Bootstrap table classes to rendered tables
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent;
+  const tables = tempDiv.querySelectorAll('table');
+  tables.forEach(table => {
+    table.className = 'table table-striped table-bordered table-hover';
+  });
+  const styledHtmlContent = tempDiv.innerHTML;
+  
   // Determine the title based on analysis level
   let analysisTitle;
   if (isStateLevel) {
@@ -192,7 +171,7 @@ export function updateStreamingResults(content, districtName, blockName, isState
     </div>
     
     <div class="analysis-content">
-      ${unsafeHTML(htmlContent)}
+      ${unsafeHTML(styledHtmlContent)}
     </div>
     
     ${followUpQuestions.length > 0 ? html`
@@ -387,7 +366,17 @@ export function updateFollowUpResponse(responseId, content) {
   
   const responseContent = document.getElementById(`${responseId}-content`);
   if (responseContent) {
-    responseContent.innerHTML = marked.parse(content);
+    const htmlContent = marked.parse(content);
+    
+    // Add Bootstrap table classes to rendered tables
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    const tables = tempDiv.querySelectorAll('table');
+    tables.forEach(table => {
+      table.className = 'table table-striped table-bordered table-hover';
+    });
+    
+    responseContent.innerHTML = tempDiv.innerHTML;
   }
 }
 

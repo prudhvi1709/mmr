@@ -8,7 +8,7 @@ import { MAX_FOLLOW_UP_QUESTIONS } from './config.js';
  */
 export async function loadLLMConfig(forceShow = false) {
   return await openaiConfig({
-    storage: sessionStorage,
+    storage: localStorage,
     key: "llmProvider",
     show: forceShow
   });
@@ -88,6 +88,43 @@ export async function callLLMAPIStreaming(apiConfig, systemPrompt, userPrompt, o
   }
   
   return accumulatedContent;
+}
+
+/**
+ * Call LLM API for single response (non-streaming)
+ * @param {Object} apiConfig - API configuration
+ * @param {string} systemPrompt - System prompt
+ * @param {string} userPrompt - User prompt
+ * @returns {Promise<string>} Response content
+ */
+export async function callLLMAPI(apiConfig, systemPrompt, userPrompt) {
+  if (!apiConfig) {
+    throw new Error("API configuration not available");
+  }
+
+  const response = await fetch(`${apiConfig.baseURL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiConfig.apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      stream: false
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`API call failed: ${error}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || '';
 }
 
 /**

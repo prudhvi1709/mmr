@@ -57,30 +57,6 @@
                                 </div>
                             </div>
 
-                            <!-- District Selection (only shown for district level) -->
-                            <div id="district-selection" class="row mb-3" style="display: none;">
-                                <div class="col-md-6">
-                                    <label for="district-name" class="form-label">
-                                        <i class="bi bi-geo-alt"></i> District Name *
-                                    </label>
-                                    <select class="form-select" 
-                                           id="district-name" 
-                                           name="district-name">
-                                        <option value="">Select a district...</option>
-                                    </select>
-                                    <small class="text-muted">Load sample data first to populate districts</small>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="block-name" class="form-label">
-                                        <i class="bi bi-map"></i> Block Name (Optional)
-                                    </label>
-                                    <input type="text" 
-                                           class="form-control" 
-                                           id="block-name" 
-                                           name="block-name"
-                                           placeholder="e.g., Fatehabad, Kiraoli">
-                                </div>
-                            </div>
                             
                             <div class="mb-3">
                                 <label for="user-query" class="form-label">
@@ -90,15 +66,15 @@
                                           id="user-query" 
                                           name="user-query"
                                           rows="3" 
-                                          placeholder="e.g., I want to reduce maternal mortality rate in Uttar Pradesh"
+                                          placeholder="e.g., I want to reduce maternal mortality rate in Agra district"
                                           required></textarea>
                                 <div class="form-text">
-                                    Ask about any health indicator improvement, performance comparison, or specific intervention needed.
+                                    Ask about any health indicator improvement, performance comparison, or specific intervention needed. For district-level analysis, include the district name in your query.
                                 </div>
                             </div>
 
                             <button type="submit" class="btn btn-primary btn-lg" id="analyze-btn">
-                                <i class="bi bi-search"></i> Analyze Health Performance
+                                <i class="bi bi-search"></i> Analyze
                             </button>
                         </form>
 

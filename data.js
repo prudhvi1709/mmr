@@ -115,4 +115,70 @@ export function analyzeBlockPerformance(data, keyIndicators) {
       }
     };
   }).sort((a, b) => a.rank - b.rank);
+}
+
+/**
+ * Extract district names from data
+ * @param {Array} data - Array of data records
+ * @returns {Array} Array of unique district names
+ */
+export function extractDistrictNames(data) {
+  return [...new Set(data.map(record => record['District Name']))].sort();
+}
+
+/**
+ * Find the best matching district name using fuzzy string matching
+ * @param {string} query - User's query text
+ * @param {Array} districtNames - Array of available district names
+ * @returns {Object|null} Object with matchedDistrict and confidence, or null if no match
+ */
+export function findBestDistrictMatch(query, districtNames) {
+  if (!query || !districtNames?.length) return null;
+  
+  const queryLower = query.toLowerCase();
+  let bestMatch = null;
+  let bestScore = 0;
+  
+  for (const district of districtNames) {
+    const districtLower = district.toLowerCase();
+    
+    // Exact match
+    if (queryLower.includes(districtLower)) {
+      return { matchedDistrict: district, confidence: 1.0, isExact: true };
+    }
+    
+    // Calculate similarity score using a simple algorithm
+    const score = calculateSimilarity(queryLower, districtLower);
+    if (score > bestScore && score > 0.6) { // Minimum threshold
+      bestScore = score;
+      bestMatch = district;
+    }
+  }
+  
+  return bestMatch ? { matchedDistrict: bestMatch, confidence: bestScore, isExact: false } : null;
+}
+
+/**
+ * Calculate string similarity using Levenshtein-like approach
+ * @param {string} query - Query string
+ * @param {string} district - District name
+ * @returns {number} Similarity score between 0 and 1
+ */
+function calculateSimilarity(query, district) {
+  // Check if district name appears as a word in the query
+  const words = query.split(/\s+/);
+  for (const word of words) {
+    if (word === district) return 1.0;
+    if (word.includes(district) || district.includes(word)) {
+      return Math.max(word.length, district.length) / Math.min(word.length, district.length) * 0.8;
+    }
+  }
+  
+  // Simple character overlap scoring
+  const queryChars = new Set(query);
+  const districtChars = new Set(district);
+  const intersection = new Set([...queryChars].filter(x => districtChars.has(x)));
+  const union = new Set([...queryChars, ...districtChars]);
+  
+  return intersection.size / union.size;
 } 
