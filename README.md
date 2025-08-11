@@ -4,6 +4,11 @@ A web application designed to help government administrators in Uttar Pradesh, I
 
 ## Features
 
+- **Intelligent Query Processing**
+  - **Data Inquiry Mode**: Ask specific questions about rankings, statistics, and comparisons for brief, direct answers
+  - **Improvement Analysis Mode**: Request comprehensive intervention strategies with detailed structured analysis
+  - **Smart Intent Recognition**: AI automatically determines question type and responds appropriately
+
 - **Multi-level Analysis**
   - State-level analysis across all districts in Uttar Pradesh
   - District-level analysis with detailed block-wise breakdowns
@@ -16,7 +21,8 @@ A web application designed to help government administrators in Uttar Pradesh, I
 
 - **AI-Powered Insights**
   - Actionable recommendations based on data patterns
-  - What-if simulations for potential interventions
+  - Context-aware responses using available health data
+  - Fallback to general knowledge for non-health related questions
   - Root cause analysis beyond available data points
 
 - **Interactive Follow-up System**
@@ -43,11 +49,12 @@ The application follows a modular architecture for better maintainability:
 2. Click "Configure LLM API" to set up your API credentials
    - The application uses bootstrap-llm-provider for API configuration
 3. Wait for the health data to auto-load from data.csv (happens automatically on page load)
-4. Select analysis level (State or District)
-   - For district-level analysis, select a specific district and optionally a block
-5. Enter your query about health issues (e.g., "How can we reduce maternal mortality in Agra?")
-6. View analysis results with visualizations and recommendations
-7. Ask follow-up questions for deeper insights
+4. Enter your query - the system will automatically determine the response type:
+   - **Data Questions**: "What is the rank of Lucknow?", "Show me statistics for Agra district", "Which district has the highest MMR?"
+   - **Improvement Questions**: "How can I reduce maternal mortality in Agra?", "What strategies should I implement?", "How to improve institutional births?"
+   - **General Questions**: Non-health related questions will receive general knowledge responses
+5. View results - brief answers for data queries, comprehensive analysis for improvement questions
+6. Ask follow-up questions for deeper insights (up to 5 per session)
 
 ## Technologies Used
 
@@ -62,8 +69,10 @@ The application follows a modular architecture for better maintainability:
 
 - **AI Integration**
   - OpenAI API for analysis and insights
+  - Intelligent query intent classification
   - Streaming responses for better user experience
   - Context-aware follow-up capabilities
+  - Adaptive response formatting based on question type
 
 ## Requirements
 
