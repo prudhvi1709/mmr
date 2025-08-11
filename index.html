@@ -18,7 +18,6 @@
                             <i class="bi bi-hospital"></i>
                             District Health Performance Analyzer
                         </h1>
-                        <p class="mb-0 opacity-75">Helping government officers improve public health outcomes</p>
                     </div>
                     <div class="card-body">
                         <!-- API Configuration -->
@@ -34,23 +33,8 @@
 
                         <!-- Query Form -->
                         <form id="analysis-form" class="border rounded p-4 bg-white">
-                            <!-- Analysis Level Toggle -->
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-toggles"></i> Analysis Level
-                                </label>
-                                <div class="btn-group w-100" role="group" aria-label="Analysis Level">
-                                    <input type="radio" class="btn-check" name="analysis-level" id="state-level" value="state" checked>
-                                    <label class="btn btn-outline-primary" for="state-level">
-                                        <i class="bi bi-map"></i> State Level (Uttar Pradesh)
-                                    </label>
-                                    
-                                    <input type="radio" class="btn-check" name="analysis-level" id="district-level" value="district">
-                                    <label class="btn btn-outline-primary" for="district-level">
-                                        <i class="bi bi-geo-alt"></i> District Level
-                                    </label>
-                                </div>
-                            </div>
+                            <!-- Hidden input to set district level as default -->
+                            <input type="hidden" name="analysis-level" value="district">
 
                             
                             <div class="mb-3">

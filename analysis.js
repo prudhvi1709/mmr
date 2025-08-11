@@ -211,4 +211,78 @@ export function summarizeContext(fullContext, isStateLevel) {
   summaryText += summary.underperforming.slice(0, 2).join('\n');
   
   return summaryText;
+}
+
+/**
+ * Prepare simplified context for data inquiry questions about a specific district
+ * @param {Array} data - Array of data records for a district
+ * @param {string} districtName - Name of district
+ * @param {string} userQuery - User's query
+ * @returns {string} Simplified context for data inquiry
+ */
+export function prepareDataInquiryContext(data, districtName, userQuery) {
+  if (!data?.length) return '';
+  
+  const districtStats = calculateDistrictStats(data);
+  
+  // Calculate district ranking (simplified)
+  const allDistricts = [...new Set(data.map(d => d['District Name']))];
+  const totalDistricts = 75; // Known from UP data
+  
+  const context = `
+USER QUESTION: "${userQuery}"
+
+DISTRICT: ${districtName}
+- Total blocks: ${data.length}
+- Maternal Mortality Ratio: ${districtStats.avgMMR.toFixed(1)} per 100k live births
+- Institutional births: ${districtStats.avgInstitutionalBirths.toFixed(1)}%
+- Full ANC coverage: ${districtStats.avgFullANC.toFixed(1)}%
+
+BLOCK-WISE DATA:
+${data.map(record => 
+  `${record['Development Block Name']}: MMR ${record['Maternal Mortality Ratio']}, Institutional births ${record['% of institutional births']}%, Full ANC ${record['% of Mothers who had full antenatal care']}%`
+).join('\n')}
+
+STATE CONTEXT:
+- Total districts in Uttar Pradesh: ${totalDistricts}
+- This district has ${data.length} blocks
+`;
+
+  return context;
+}
+
+/**
+ * Prepare simplified context for state-level data inquiry questions
+ * @param {Array} data - Array of all data records
+ * @param {string} userQuery - User's query
+ * @returns {string} Simplified context for state data inquiry
+ */
+export function prepareStateDataInquiryContext(data, userQuery) {
+  if (!data?.length) return '';
+  
+  const stateStats = calculateStateStats(data);
+  const districtPerformance = analyzeDistrictPerformance(data);
+  
+  const context = `
+USER QUESTION: "${userQuery}"
+
+UTTAR PRADESH STATE DATA:
+- Total districts: ${stateStats.totalDistricts}
+- Total blocks: ${data.length}
+- State average MMR: ${stateStats.avgMMR.toFixed(1)} per 100k live births
+- State average institutional births: ${stateStats.avgInstitutionalBirths.toFixed(1)}%
+- State average Full ANC: ${stateStats.avgFullANC.toFixed(1)}%
+
+DISTRICT RANKINGS (by MMR - lower is better):
+${districtPerformance.slice(0, 10).map((district, index) => 
+  `${index + 1}. ${district.districtName}: MMR ${district.avgMMR.toFixed(1)}, Institutional births ${district.avgInstitutionalBirths.toFixed(1)}%`
+).join('\n')}
+
+BOTTOM PERFORMING DISTRICTS:
+${districtPerformance.slice(-5).map((district, index) => 
+  `${districtPerformance.length - 4 + index}. ${district.districtName}: MMR ${district.avgMMR.toFixed(1)}, Institutional births ${district.avgInstitutionalBirths.toFixed(1)}%`
+).join('\n')}
+`;
+
+  return context;
 } 

@@ -63,21 +63,12 @@ export function updateDataStatus(message) {
  * Setup analysis level toggle behavior
  */
 export function setupAnalysisLevelToggle() {
-  const stateRadio = document.getElementById('state-level');
-  const districtRadio = document.getElementById('district-level');
   const userQueryTextarea = document.getElementById('user-query');
-
-  // Handle toggle changes
-  const handleToggleChange = () => {
-    if (districtRadio.checked) {
-      userQueryTextarea.placeholder = "e.g., I want to reduce maternal mortality rate in Agra district";
-    } else {
-      userQueryTextarea.placeholder = "e.g., I want to reduce maternal mortality rate in Uttar Pradesh";
-    }
-  };
-
-  stateRadio.addEventListener('change', handleToggleChange);
-  districtRadio.addEventListener('change', handleToggleChange);
+  
+  // Set placeholder for district level analysis
+  if (userQueryTextarea) {
+    userQueryTextarea.placeholder = "e.g., I want to reduce maternal mortality rate in Agra district";
+  }
 }
 
 /**
@@ -435,6 +426,91 @@ export function updateFollowUpResponse(responseId, content) {
     
     responseContent.innerHTML = tempDiv.innerHTML;
   }
+}
+
+/**
+ * Update results for general (non-health) queries
+ * @param {string} content - Content to display
+ * @param {string} query - Original user query
+ */
+export function updateGeneralQueryResults(content, query) {
+  const resultsContent = document.getElementById('results-content');
+  if (!resultsContent) return;
+  
+  const htmlContent = marked.parse(content);
+  
+  const template = html`
+    <div class="analysis-header mb-4">
+      <h5 class="text-info">
+        <i class="bi bi-question-circle"></i>
+        General Query Response
+      </h5>
+      <p class="text-muted">Generated on ${new Date().toLocaleString()}</p>
+    </div>
+    
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle"></i>
+      <strong>Your Question:</strong> ${query}
+    </div>
+    
+    <div class="analysis-content">
+      ${unsafeHTML(htmlContent)}
+    </div>
+    
+    <div class="mt-4 p-3 bg-light rounded">
+      <small class="text-muted">
+        <i class="bi bi-info-circle"></i>
+        <strong>Note:</strong> This response is based on general knowledge and not specific to the health data available in this system.
+      </small>
+    </div>
+  `;
+  
+  render(template, resultsContent);
+}
+
+/**
+ * Update results for data inquiry questions
+ * @param {string} content - Content to display
+ * @param {string} query - Original user query
+ * @param {string} districtName - District name (if applicable)
+ */
+export function updateDataInquiryResults(content, query, districtName) {
+  const resultsContent = document.getElementById('results-content');
+  if (!resultsContent) return;
+  
+  const htmlContent = marked.parse(content);
+  
+  const template = html`
+    <div class="analysis-header mb-4">
+      <h5 class="text-success">
+        <i class="bi bi-info-circle"></i>
+        Data Inquiry${districtName ? ` - ${districtName}` : ' - State Data'}
+      </h5>
+      <p class="text-muted">Generated on ${new Date().toLocaleString()}</p>
+    </div>
+    
+    <div class="alert alert-light border-start border-success border-4">
+      <i class="bi bi-question-circle text-success"></i>
+      <strong>Your Question:</strong> ${query}
+    </div>
+    
+    <div class="analysis-content">
+      <div class="card">
+        <div class="card-body">
+          ${unsafeHTML(htmlContent)}
+        </div>
+      </div>
+    </div>
+    
+    <div class="mt-4 p-3 bg-light rounded">
+      <small class="text-muted">
+        <i class="bi bi-database"></i>
+        <strong>Data Source:</strong> Based on available health data for Uttar Pradesh districts and blocks.
+      </small>
+    </div>
+  `;
+  
+  render(template, resultsContent);
 }
 
 /**

@@ -7,9 +7,10 @@ import {
   setupAnalysisLevelToggle, setupSystemPromptUI,
   showResultsSection, updateStreamingResults, setupFollowUpEventListeners,
   showFollowUpLoading, hideFollowUpLoading, appendFollowUpQuestion,
-  appendFollowUpResponsePlaceholder, updateFollowUpResponse, updateRemainingChats
+  appendFollowUpResponsePlaceholder, updateFollowUpResponse, updateRemainingChats,
+  updateGeneralQueryResults, updateDataInquiryResults
 } from './ui.js';
-import { prepareStateAnalysisContext, prepareDistrictAnalysisContext, summarizeContext } from './analysis.js';
+import { prepareStateAnalysisContext, prepareDistrictAnalysisContext, summarizeContext, prepareDataInquiryContext, prepareStateDataInquiryContext } from './analysis.js';
 
 // Global state
 let data = [];
@@ -117,32 +118,55 @@ async function handleAnalysis(event) {
   let districtName = null;
   let blockName = null;
 
-  // For district-level analysis, use LLM to extract district name
-  if (analysisLevel === 'district') {
-    try {
-      showLoading("Identifying district from your query...");
-      districtName = await extractDistrictNameWithLLM(userQuery, districtNames, apiConfig);
-      if (!districtName) {
-        showError("Could not identify a district name in your query. Please mention a district name from Uttar Pradesh.");
-        hideLoading();
-        return;
-      }
-      // Show which district was identified
-      showSuccess(`Analyzing data for: ${districtName}`);
-    } catch (error) {
-      showError("Failed to identify district: " + error.message);
+  // First, check if the query is related to health/MMR data
+  try {
+    showLoading("Analyzing your question...");
+    const isHealthRelated = await checkQueryRelevance(userQuery, apiConfig);
+    
+    if (!isHealthRelated) {
+      // Handle non-health related queries with general knowledge
+      showLoading("Generating response based on general knowledge...");
+      await handleGeneralQuery(userQuery);
+      return;
+    }
+
+    // Classify intent for health-related queries
+    const queryIntent = await classifyQueryIntent(userQuery, apiConfig);
+    
+    if (queryIntent === 'DATA_INQUIRY') {
+      // Handle data inquiry questions with brief answers
+      showLoading("Looking up data...");
+      await handleDataInquiry(userQuery);
+      return;
+    }
+    
+    // Continue with full analysis for improvement/intervention questions
+  } catch (error) {
+    showError("Failed to process query: " + error.message);
+    hideLoading();
+    return;
+  }
+
+  // Extract district name from query using LLM (only for health-related queries)
+  try {
+    showLoading("Identifying district from your query...");
+    districtName = await extractDistrictNameWithLLM(userQuery, districtNames, apiConfig);
+    if (!districtName) {
+      showError("Could not identify a district name in your query. Please mention a district name from Uttar Pradesh.");
       hideLoading();
       return;
     }
+    // Show which district was identified
+    showSuccess(`Analyzing data for: ${districtName}`);
+  } catch (error) {
+    showError("Failed to identify district: " + error.message);
+    hideLoading();
+    return;
   }
 
   try {
     showLoading("Analyzing health data...");
-    if (analysisLevel === 'state') {
-      await performStateAnalysis(userQuery);
-    } else {
-      await performDistrictAnalysis(districtName, blockName, userQuery);
-    }
+    await performDistrictAnalysis(districtName, blockName, userQuery);
   } catch (error) {
     showError("Analysis failed: " + error.message);
   } finally {
@@ -315,6 +339,159 @@ async function sendFollowUpQuestion(question) {
     showError("Failed to send message: " + error.message);
   } finally {
     hideFollowUpLoading();
+  }
+}
+
+/**
+ * Classify the intent of a health-related query
+ * @param {string} userQuery - User's query text
+ * @param {Object} apiConfig - API configuration
+ * @returns {Promise<string>} Intent type: 'DATA_INQUIRY' or 'IMPROVEMENT'
+ */
+async function classifyQueryIntent(userQuery, apiConfig) {
+  const systemPrompt = `You are a query intent classifier for health data questions. Classify user queries into one of these categories:
+
+1. DATA_INQUIRY: Questions asking for specific data points, rankings, comparisons, or factual information
+   - Examples: "What is the rank of Lucknow?", "Show me MMR for Agra", "Which district has highest institutional births?", "Compare Kanpur and Allahabad", "What are the statistics for...", "Tell me about performance of..."
+
+2. IMPROVEMENT: Questions asking for recommendations, strategies, interventions, or how to improve something
+   - Examples: "How can I improve maternal mortality?", "What should I do to reduce MMR?", "Strategies for increasing institutional births", "How to improve performance?", "What interventions are needed?"
+
+Return only "DATA_INQUIRY" or "IMPROVEMENT" based on the query intent.`;
+
+  const userPrompt = `Classify this health data query: "${userQuery}"`;
+  
+  try {
+    const response = await callLLMAPI(apiConfig, systemPrompt, userPrompt);
+    const intent = response.trim().toUpperCase();
+    return intent === 'DATA_INQUIRY' ? 'DATA_INQUIRY' : 'IMPROVEMENT';
+  } catch (error) {
+    console.error('Error classifying query intent:', error);
+    // Default to improvement to maintain existing functionality
+    return 'IMPROVEMENT';
+  }
+}
+
+/**
+ * Handle data inquiry questions with brief, direct answers
+ * @param {string} userQuery - User's query
+ */
+async function handleDataInquiry(userQuery) {
+  // Try to extract district name for data lookup
+  let districtName = null;
+  try {
+    districtName = await extractDistrictNameWithLLM(userQuery, districtNames, apiConfig);
+  } catch (error) {
+    console.error('Error extracting district name for data inquiry:', error);
+  }
+
+  // Prepare simplified context for data inquiry
+  let context = '';
+  if (districtName) {
+    const districtData = data.filter(record => 
+      record['District Name'].toLowerCase().includes(districtName.toLowerCase())
+    );
+    if (districtData.length > 0) {
+      context = prepareDataInquiryContext(districtData, districtName, userQuery);
+    }
+  }
+  
+  // If no specific district, provide state-level context
+  if (!context) {
+    context = prepareStateDataInquiryContext(data, userQuery);
+  }
+
+  // Get system prompt for data inquiry
+  const systemPrompt = `You are a health data assistant. Answer the user's question directly and briefly (2-4 sentences max). 
+  
+  Provide specific numbers, rankings, and comparisons. Be factual and concise. Do not use templates or lengthy analysis.
+  
+  Examples of good responses:
+  - "Lucknow district ranks 15th out of 75 districts with an MMR of 89.2 per 100k live births, better than the state average of 112.3."
+  - "Agra has 6 blocks with institutional births ranging from 21% to 67%. The district average is 35.5%."`;
+
+  // Show results section
+  showResultsSection(`Data: ${districtName || 'State-wide'}`, null, !districtName);
+  hideLoading();
+
+  try {
+    // Call LLM API with streaming
+    const content = await callLLMAPIStreaming(
+      apiConfig, 
+      systemPrompt, 
+      context, 
+      (accumulatedContent) => {
+        updateDataInquiryResults(accumulatedContent, userQuery, districtName);
+      }
+    );
+  } catch (error) {
+    showError("Failed to retrieve data: " + error.message);
+  }
+}
+
+/**
+ * Check if user query is related to available health data
+ * @param {string} userQuery - User's query text
+ * @param {Object} apiConfig - API configuration
+ * @returns {Promise<boolean>} True if health-related, false otherwise
+ */
+async function checkQueryRelevance(userQuery, apiConfig) {
+  const systemPrompt = `You are a query classifier that determines if a user question is related to available health data in Uttar Pradesh, India.
+
+The available data includes:
+- Maternal Mortality Ratio (MMR)
+- Institutional births percentage
+- Antenatal care coverage
+- Maternal health indicators
+- District and block-level health performance
+
+Your task is to determine if the user's query is related to these health topics. 
+
+Return only "YES" if the query is related to maternal health, institutional births, antenatal care, maternal mortality, or general health performance in Uttar Pradesh districts.
+
+Return only "NO" if the query is about unrelated topics like agriculture, education, economy, technology, politics, etc.`;
+
+  const userPrompt = `Is this query related to available health data: "${userQuery}"`;
+  
+  try {
+    const response = await callLLMAPI(apiConfig, systemPrompt, userPrompt);
+    return response.trim().toUpperCase() === 'YES';
+  } catch (error) {
+    console.error('Error checking query relevance:', error);
+    // Default to true to maintain backward compatibility
+    return true;
+  }
+}
+
+/**
+ * Handle general (non-health related) queries with LLM knowledge
+ * @param {string} userQuery - User's query
+ */
+async function handleGeneralQuery(userQuery) {
+  // Get system prompt from textarea (or fallback)
+  let systemPrompt = `You are a helpful assistant. The user has asked a question that is not related to the specific health data available in this system. 
+
+Please respond with: "I don't have specific data available to answer your question about [topic]. However, based on my general knowledge: [provide helpful general information about the topic]"
+
+Be informative and helpful while acknowledging the data limitation.`;
+  
+  // Show results section
+  showResultsSection("General Query", null, false);
+  hideLoading();
+  
+  try {
+    // Call LLM API with streaming
+    const content = await callLLMAPIStreaming(
+      apiConfig, 
+      systemPrompt, 
+      userQuery, 
+      (accumulatedContent) => {
+        // Update results without the usual health data formatting
+        updateGeneralQueryResults(accumulatedContent, userQuery);
+      }
+    );
+  } catch (error) {
+    showError("Failed to generate response: " + error.message);
   }
 }
 
