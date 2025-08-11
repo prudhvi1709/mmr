@@ -144,13 +144,42 @@ export function updateStreamingResults(content, districtName, blockName, isState
   
   const htmlContent = marked.parse(mainContent);
   
-  // Add Bootstrap table classes to rendered tables
+  // Add Bootstrap table classes only
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = htmlContent;
   const tables = tempDiv.querySelectorAll('table');
   tables.forEach(table => {
     table.className = 'table table-striped table-bordered table-hover';
+    
+    // Make table headers stand out with Bootstrap classes
+    const headers = table.querySelectorAll('th');
+    headers.forEach(th => {
+      th.classList.add('table-primary', 'text-center', 'fw-bold');
+    });
+    
+    // Center align numeric data
+    const cells = table.querySelectorAll('td');
+    cells.forEach(td => {
+      const text = td.textContent.trim();
+      if (text.match(/^\d+(\.\d+)?%?$/) || text.match(/^\d+\/\d+$/)) {
+        td.classList.add('text-center', 'fw-semibold');
+      }
+    });
   });
+  
+  // Add Bootstrap color classes for priority sections
+  const priorityHeaders = tempDiv.querySelectorAll('strong');
+  priorityHeaders.forEach(header => {
+    const text = header.textContent;
+    if (text.includes('Tier 1') || text.includes('Urgent')) {
+      header.classList.add('text-danger', 'fs-6');
+    } else if (text.includes('Tier 2') || text.includes('Pipeline')) {
+      header.classList.add('text-warning', 'fs-6');
+    } else if (text.includes('Access') || text.includes('Quality') || text.includes('Coverage')) {
+      header.classList.add('text-info');
+    }
+  });
+  
   const styledHtmlContent = tempDiv.innerHTML;
   
   // Determine the title based on analysis level
@@ -368,12 +397,40 @@ export function updateFollowUpResponse(responseId, content) {
   if (responseContent) {
     const htmlContent = marked.parse(content);
     
-    // Add Bootstrap table classes to rendered tables
+    // Add Bootstrap table classes for follow-up responses
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlContent;
     const tables = tempDiv.querySelectorAll('table');
     tables.forEach(table => {
-      table.className = 'table table-striped table-bordered table-hover';
+      table.className = 'table table-striped table-bordered table-hover table-sm';
+      
+      // Style table headers with Bootstrap classes
+      const headers = table.querySelectorAll('th');
+      headers.forEach(th => {
+        th.classList.add('table-info', 'text-center', 'fw-bold');
+      });
+      
+      // Center align numeric data
+      const cells = table.querySelectorAll('td');
+      cells.forEach(td => {
+        const text = td.textContent.trim();
+        if (text.match(/^\d+(\.\d+)?%?$/) || text.match(/^\d+\/\d+$/)) {
+          td.classList.add('text-center', 'fw-semibold');
+        }
+      });
+    });
+    
+    // Style priority sections with Bootstrap color classes
+    const priorityHeaders = tempDiv.querySelectorAll('strong');
+    priorityHeaders.forEach(header => {
+      const text = header.textContent;
+      if (text.includes('Tier 1') || text.includes('Urgent')) {
+        header.classList.add('text-danger');
+      } else if (text.includes('Tier 2') || text.includes('Pipeline')) {
+        header.classList.add('text-warning');
+      } else if (text.includes('Access') || text.includes('Quality') || text.includes('Coverage')) {
+        header.classList.add('text-info');
+      }
     });
     
     responseContent.innerHTML = tempDiv.innerHTML;

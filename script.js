@@ -24,16 +24,17 @@ async function init() {
   await loadLLMConfig();
   setupEventListeners();
   setupFormSaving();
-  checkDataStatus();
   setupSystemPromptUI(DEFAULT_SYSTEM_PROMPT);
   setupAnalysisLevelToggle();
+  
+  // Auto-load sample data on page load
+  await loadSampleData();
 }
 
 /**
  * Set up event listeners
  */
 function setupEventListeners() {
-  document.getElementById('load-sample-btn').addEventListener('click', loadSampleData);
   document.getElementById('analysis-form').addEventListener('submit', handleAnalysis);
   document.getElementById('config-api-btn').addEventListener('click', configureAPI);
 }
@@ -55,14 +56,6 @@ function setupFormSaving() {
   });
 }
 
-/**
- * Check data status
- */
-function checkDataStatus() {
-  if (data.length === 0) {
-    updateDataStatus("No data loaded. Click 'Load Sample Data' to begin.");
-  }
-}
 
 /**
  * Load sample data
@@ -108,7 +101,7 @@ async function handleAnalysis(event) {
   }
 
   if (data.length === 0) {
-    showError("Please load sample data first.");
+    showError("Data not loaded. Please refresh the page.");
     return;
   }
 

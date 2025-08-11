@@ -42,7 +42,7 @@ The application follows a modular architecture for better maintainability:
 1. Open `index.html` in a web browser
 2. Click "Configure LLM API" to set up your API credentials
    - The application uses bootstrap-llm-provider for API configuration
-3. Click "Load Sample Data" to import the health data from data.csv
+3. Wait for the health data to auto-load from data.csv (happens automatically on page load)
 4. Select analysis level (State or District)
    - For district-level analysis, select a specific district and optionally a block
 5. Enter your query about health issues (e.g., "How can we reduce maternal mortality in Agra?")
